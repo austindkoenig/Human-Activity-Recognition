@@ -23,12 +23,11 @@ class HARSystem(object):
     
     def preprocess(self):
         label_bank = os.listdir(self.data_fp)
-        for i in range(2):#len(label_bank)):
+        for i in range(len(label_bank)):
             root = os.path.join(self.data_fp, label_bank[i])
             files = os.listdir(root)
             for f in files:
                 x = np.genfromtxt(os.path.join(root, f), delimiter = ' ')
-                print(x.shape)
                 y = label_bank[i]
 
     def build_model(self):
