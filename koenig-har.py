@@ -11,7 +11,7 @@ import os
 #from keras import models
 #from keras import layers
 #from keras import optimizers
-#from keras.preprocessing import sequence
+from keras.preprocessing import sequence
 
 class HARSystem(object):
     '''
@@ -23,7 +23,16 @@ class HARSystem(object):
 
         self.labels = None
         self.raw_data = None
-        self.data = None
+        self.data = {
+            'ss': {
+                'x': np.empty((0, 3, 256)),
+                'y': None
+            },
+            'ls': {
+                'x': np.empty((0, 3, 10000)),
+                'y': None
+            }
+        }
 
         self.train = None
         self.val = None
@@ -44,28 +53,38 @@ class HARSystem(object):
 
         self.labels = os.listdir(self.data_fp)
 
+        class_samples = []
+        total_samples = 0
+
         # Extract data from text files
         for i in range(len(self.labels)):
             root = os.path.join(self.data_fp, self.labels[i])
             files = os.listdir(root)
-            class_samples = 0
+            class_samples.append(0)
 
             for f in files:
-                x = np.genfromtxt(os.path.join(root, f), delimiter = ' ')
+                x = np.genfromtxt(os.path.join(root, f), delimiter = ' ').T
                 rawX.append(x)
                 rawY.append(i)
-                class_samples += 1
-            
-            min_length = min([len(x) for x in rawX])
-            max_length = max([len(x) for x in rawX])
-            print(f'| {self.labels[i]} | {class_samples} | {round(class_samples / 839, 6)} | {min_length} | {max_length} |')
-        print()
-        
-        print(len(rawX))
-        #rawX = np.reshape(np.dstack(rawX), (len(rawX), 3, -1))
-        #rawY = np.array(rawY)
-        #print(rawX.shape, rawY.shape)
-        #self.raw_data = (rawX, rawY)
+
+                xs = sequence.pad_sequences(x, maxlen = 256, value = -1)
+                xl = sequence.pad_sequences(x, maxlen = 10000, value = -1)
+                xs = np.reshape(xs, (1, xs.shape[0], xs.shape[1]))
+                xl = np.reshape(xl, (1, xl.shape[0], xl.shape[1]))
+
+                self.data['ss']['x'] = np.vstack((self.data['ss']['x'], xs))
+                self.data['ls']['x'] = np.vstack((self.data['ls']['x'], xl))
+
+                class_samples[i] += 1
+                total_samples += 1
+            #min_length = min([len(x) for x in rawX])
+            #max_length = max([len(x) for x in rawX])
+            #print(f'| {self.labels[i]} | {class_samples} | {round(class_samples / 839, 6)} | {min_length} | {max_length} |')
+
+        self.data['ss']['y'] = np.array(rawY)
+        self.data['ls']['y'] = np.array(rawY)
+        self.raw_data = (rawX, rawY)
+        print(self.data['ss']['x'].shape, self.data['ss']['y'].shape)
 
     def build_model(self):
         pass
