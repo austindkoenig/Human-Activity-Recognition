@@ -6,7 +6,7 @@
 
 ### Data
 
-The outcome of this project is to create a classifier which can differentiate between 14 different human activities from data collected via a triaxial accelerometer mounted to the subjects' wrists.
+The object of this project is to create a classifier which can differentiate between 14 different human activities from data collected via a triaxial accelerometer mounted to the subjects' wrists.
 
 Following is the specifications of the device used to record the data:
 
@@ -62,7 +62,7 @@ Solution 3 is similar to solution 2 for the same reasons described.
 
 Solution 4 is also unknown. We may run into problems similar to those discussed with solutions 2 and 3. However, as most of the activities are cyclic in nature (that is, the activity appears similar over any two similarly-sized time intervals), we may be able to utilize this solution. For example, if we consider recording this data of a subject walking for 30 seconds, the subject might be moving between seconds 5 and 7 in a similar fashion as she might between seconds 22 and 24. In this sense, walking is cyclic: after two steps, it is the same movements over and over again. Eating is also cyclic, as is brushing teeth and descending stairs. 
 
-A subset of the samples are extraordinarily long, some containing close to 10,000 time steps, which translates to about five minutes recording at 32 Hz. It is easy to convince oneself that splitting an extremely long sequence into smaller sequences to be used as individual observations might behoove us in terms of the sample size issue described above without eliminating important long-term feature relationships. On the other hand, not all of our classes share this property of cyclicity: things like pouring water, sitting down into a chair, and getting out of bed are not cyclic. Therefore, we might anticipate a shift in performance from non-cyclic activities to cyclic activities if we exercise this solution.
+A subset of the samples are extraordinarily long, some containing close to 10,000 time steps, which translates to about five minutes recording at 32 Hz. It is easy to convince oneself that splitting an extremely long sequence into smaller sequences to be used as individual observations might behoove our results without eliminating important long-term feature relationships. On the other hand, not all of our classes share this property of cyclicity: actions like pouring water, sitting down into a chair, and getting out of bed are not cyclic. Therefore, we might anticipate a shift in performance from non-cyclic activities to cyclic activities if we exercise this solution because cyclic activities will gain more samples.
 
 Finally, solution 5 is the easy way out. It is not detrimental to the project since only half of our classes are underpopulated. It is, indeed, a viable solution.
 
