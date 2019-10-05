@@ -42,6 +42,8 @@ class HARSystem(object):
         self.sscaler = [preprocessing.MinMaxScaler(feature_range = (0, 1), copy = False) for _ in range(3)] # scalers for each channel
         self.lscaler = [preprocessing.MinMaxScaler(feature_range = (0, 1), copy = False) for _ in range(3)]
 
+        self.models = {}
+
         self.labels = None
         self.raw_data = None
 
