@@ -23,11 +23,20 @@ class HARSystem(object):
     Methods
     -------
     preprocess_data : None
+        Loads, splits, and scales data.
+
+    resample_classes : None
+        Resamples data to reduce class size imbalance.
+
     build_model : None
+        Builds model.
+
     evaluate_model : None
+        Train and evaluates model.
+
     '''
-    def __init__(self, data_fp = './data/'):
-        self.data_fp = data_fp # data filepath
+    def __init__(self):
+        self.data_fp = './data/' # data filepath
         self.tr_split = 0.6 # train split
         self.val_ts_split = 0.2 # val/test split
         self.sscaler = [preprocessing.MinMaxScaler(feature_range = (0, 1), copy = False) for _ in range(3)] # scalers for each channel
@@ -67,7 +76,7 @@ class HARSystem(object):
             },
             'y': None
         }
-    
+
     def preprocess_data(self):
         '''
         Prepares the data for the activity recognizer.
@@ -173,6 +182,9 @@ class HARSystem(object):
         print("Data scaling complete.")
         print("PREPROCESSING COMPLETE.")
 
+    def resample_classes(self):
+        pass
+    
     def build_model(self):
         pass
 
