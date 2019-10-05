@@ -12,6 +12,7 @@ import os
 #from keras import layers
 #from keras import optimizers
 from keras.preprocessing import sequence
+from sklearn import preprocessing
 
 class HARSystem(object):
     '''
@@ -34,9 +35,36 @@ class HARSystem(object):
             }
         }
 
-        self.train = None
-        self.val = None
-        self.test = None
+        self.train = {
+            'ss': {
+                'x': np.empty((0, 3, 256)),
+                'y': None
+            },
+            'ls': {
+                'x': np.empty((0, 3, 10000)),
+                'y': None
+            }
+        }
+        self.val = {
+            'ss': {
+                'x': np.empty((0, 3, 256)),
+                'y': None
+            },
+            'ls': {
+                'x': np.empty((0, 3, 10000)),
+                'y': None
+            }
+        }
+        self.test = {
+            'ss': {
+                'x': np.empty((0, 3, 256)),
+                'y': None
+            },
+            'ls': {
+                'x': np.empty((0, 3, 10000)),
+                'y': None
+            }
+        }
     
     def preprocess_data(self):
         '''
@@ -56,7 +84,9 @@ class HARSystem(object):
         class_samples = []
         total_samples = 0
 
-        # Extract data from text files
+        print("Extracting data from files...")
+
+        # DATA EXTRACTION
         for i in range(len(self.labels)):
             root = os.path.join(self.data_fp, self.labels[i])
             files = os.listdir(root)
@@ -85,6 +115,16 @@ class HARSystem(object):
         self.data['ls']['y'] = np.array(rawY)
         self.raw_data = (rawX, rawY)
         print(self.data['ss']['x'].shape, self.data['ss']['y'].shape)
+        print("Data extraction complete.")
+
+        # DATA SPLITTING
+        print("Splitting data...")
+        print("Data splitting complete.")
+
+        # DATA SCALING
+        print("Scaling data...")
+        #scaler = preprocessing.MinMaxScaler()
+        print("Data scaling complete.")
 
     def build_model(self):
         pass
