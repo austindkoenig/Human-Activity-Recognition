@@ -4,6 +4,8 @@
 
 ## Issues and Notes
 
+Consider the following table.
+
 | Activity Name | # Sequences | % Sequences | Min Seq Length | Max Seq Length |
 | --- | --- | --- | --- | --- |
 | Brush_teeth | 12 | 0.014303 | 844 | 3199 |
@@ -21,6 +23,9 @@
 | Use_telephone | 13 | 0.015495 | 125 | 9318 |
 | Walk | 100 | 0.11919 | 125 | 9318 | 
 
+Notice that a few of the classes represent fewer than five percent of the entire dataset whereas others account for around ten percent. Proposed solutions:
+- Simply remove undersized classes
+- Oversample undersized classes
 
 ## Acknowledgments
 
