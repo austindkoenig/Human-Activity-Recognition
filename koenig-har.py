@@ -49,32 +49,32 @@ class HARSystem(object):
 
         self.data = {
             'x': {
-                'ss': np.empty((0, 3, 256)),
-                'ls': np.empty((0, 3, 10000))
+                'ss': np.empty((0, 256, 3)),
+                'ls': np.empty((0, 10000, 3))
             },
             'y': None
         }
 
         self.train = {
             'x': {
-                'ss': np.empty((0, 3, 256)),
-                'ls': np.empty((0, 3, 10000))
+                'ss': np.empty((0, 256, 3)),
+                'ls': np.empty((0, 10000, 3))
             },
             'y': None
         }
 
         self.test = {
             'x': {
-                'ss': np.empty((0, 3, 256)),
-                'ls': np.empty((0, 3, 10000))
+                'ss': np.empty((0, 256, 3)),
+                'ls': np.empty((0, 10000, 3))
             },
             'y': None
         }
 
         self.val = {
             'x': {
-                'ss': np.empty((0, 3, 256)),
-                'ls': np.empty((0, 3, 10000))
+                'ss': np.empty((0, 256, 3)),
+                'ls': np.empty((0, 10000, 3))
             },
             'y': None
         }
@@ -100,16 +100,16 @@ class HARSystem(object):
             class_samples.append(0)
 
             for f in files:
-                x = np.genfromtxt(os.path.join(root, f), delimiter = ' ').T # get sample from text file
+                x = np.genfromtxt(os.path.join(root, f), delimiter = ' ') # get sample from text file
                 rawX.append(x) # raw sample input
                 rawY.append(i) # raw sample output
 
-                xs = sequence.pad_sequences(x, maxlen = 256, value = -1) # short-sequence samples
-                xl = sequence.pad_sequences(x, maxlen = 10000, value = -1) # long-sequence samples
+                xs = sequence.pad_sequences(x.T, maxlen = 256, value = -1) # short-sequence samples
+                xl = sequence.pad_sequences(x.T, maxlen = 10000, value = -1) # long-sequence samples
 
                 # reshape arrays to be stacked
-                xs = np.reshape(xs, (1, xs.shape[0], xs.shape[1]))
-                xl = np.reshape(xl, (1, xl.shape[0], xl.shape[1]))
+                xs = np.reshape(xs, (1, xs.shape[1], xs.shape[0]))
+                xl = np.reshape(xl, (1, xl.shape[1], xl.shape[0]))
 
                 self.data['x']['ss'] = np.vstack((self.data['x']['ss'], xs)) # vertically stack samples
                 self.data['x']['ls'] = np.vstack((self.data['x']['ls'], xl))
