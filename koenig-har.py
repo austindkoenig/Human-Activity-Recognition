@@ -7,14 +7,18 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+import shutil
 import joblib
 
-#from keras import models
-#from keras import layers
-#from keras import optimizers
+import keras
+from keras import models
+from keras import layers
+from keras import optimizers
 from keras.preprocessing import sequence
 
 from sklearn import preprocessing
+from sklearn import metrics
+from sklearn import utils
 
 class HARSystem(object):
     '''
@@ -39,43 +43,32 @@ class HARSystem(object):
         self.data_fp = './data/' # data filepath
         self.tr_split = 0.6 # train split
         self.val_ts_split = 0.2 # val/test split
-        self.sscaler = [preprocessing.MinMaxScaler(feature_range = (0, 1), copy = False) for _ in range(3)] # scalers for each channel
-        self.lscaler = [preprocessing.MinMaxScaler(feature_range = (0, 1), copy = False) for _ in range(3)]
+        self.scaler = [preprocessing.MinMaxScaler(feature_range = (0, 1), copy = False) for _ in range(3)] # scalers for each channel
 
-        self.models = {}
+        self.MODELS = {}
+        self.HISTS = {}
+        self.TESTS = {}
 
         self.labels = None
         self.raw_data = None
 
         self.data = {
-            'x': {
-                'ss': np.empty((0, 256, 3)),
-                'ls': np.empty((0, 10000, 3))
-            },
+            'x': np.empty((0, 512, 3)),
             'y': None
         }
 
         self.train = {
-            'x': {
-                'ss': np.empty((0, 256, 3)),
-                'ls': np.empty((0, 10000, 3))
-            },
+            'x': np.empty((0, 512, 3)),
             'y': None
         }
 
         self.test = {
-            'x': {
-                'ss': np.empty((0, 256, 3)),
-                'ls': np.empty((0, 10000, 3))
-            },
+            'x': np.empty((0, 512, 3)),
             'y': None
         }
 
         self.val = {
-            'x': {
-                'ss': np.empty((0, 256, 3)),
-                'ls': np.empty((0, 10000, 3))
-            },
+            'x': np.empty((0, 512, 3)),
             'y': None
         }
 
@@ -93,7 +86,7 @@ class HARSystem(object):
         total_samples = 0 # total number of samples
 
         # DATA EXTRACTION
-        print("Extracting data from files...")
+        print("    Extracting data from files...")
         for i in range(len(self.labels)):
             root = os.path.join(self.data_fp, self.labels[i])
             files = os.listdir(root) # go through data directories
@@ -104,100 +97,222 @@ class HARSystem(object):
                 rawX.append(x) # raw sample input
                 rawY.append(i) # raw sample output
 
-                xs = sequence.pad_sequences(x.T, maxlen = 256, value = -1) # short-sequence samples
-                xl = sequence.pad_sequences(x.T, maxlen = 10000, value = -1) # long-sequence samples
-
-                # reshape arrays to be stacked
-                xs = np.reshape(xs, (1, xs.shape[1], xs.shape[0]))
-                xl = np.reshape(xl, (1, xl.shape[1], xl.shape[0]))
-
-                self.data['x']['ss'] = np.vstack((self.data['x']['ss'], xs)) # vertically stack samples
-                self.data['x']['ls'] = np.vstack((self.data['x']['ls'], xl))
+                xx = sequence.pad_sequences(x.T, maxlen = 512, value = -1) # short-sequence samples                
+                xx = np.reshape(xx, (1, xx.shape[1], xx.shape[0])) # reshape arrays to be stacked
+                self.data['x'] = np.vstack((self.data['x'], xx)) # vertically stack samples
 
                 class_samples[i] += 1
                 total_samples += 1
 
-        self.data['y'] = np.array(rawY)
-        self.data['y'] = np.array(rawY)
+        y = np.array(rawY)
+        n_cats = np.max(y) + 1
+        y = keras.utils.to_categorical(y, n_cats) # one-hot encode outputs
+        new_indices = np.arange(self.data['x'].shape[0])
+        np.random.shuffle(new_indices) # shuffle data
+        self.data['x'] = self.data['x'][new_indices, :, :]
+        self.data['y'] = y[new_indices, :]
         self.raw_data = (rawX, rawY) # copy of raw data
-        print("Data extraction complete.")
+        print("    Data extraction complete.")
 
         # DATA SPLITTING
-        print("Splitting data...")
+        print("    Splitting data...")
 
-        train_idx = round(self.tr_split * self.data['x']['ss'].shape[0]) # train index
-        val_idx = round(self.val_ts_split * self.data['x']['ss'].shape[0]) # val/test index
+        train_idx = round(self.tr_split * self.data['x'].shape[0]) # train index
+        val_idx = round(self.val_ts_split * self.data['x'].shape[0]) # val/test index
 
-        self.train['x']['ss'] = self.data['x']['ss'][:train_idx, :, :]
-        self.train['x']['ls'] = self.data['x']['ls'][:train_idx, :, :]
-        self.train['y'] = self.data['y'][:train_idx]
+        self.train['x'] = self.data['x'][:train_idx, :, :]
+        self.train['y'] = self.data['y'][:train_idx, :]
 
-        self.val['x']['ss'] = self.data['x']['ss'][train_idx:(train_idx + val_idx), :, :]
-        self.val['x']['ls'] = self.data['x']['ls'][train_idx:(train_idx + val_idx), :, :]
-        self.val['y'] = self.data['y'][train_idx:(train_idx + val_idx)]
+        self.val['x'] = self.data['x'][train_idx:(train_idx + val_idx), :, :]
+        self.val['y'] = self.data['y'][train_idx:(train_idx + val_idx), :]
 
-        self.test['x']['ss'] = self.data['x']['ss'][(train_idx + val_idx):, :, :]
-        self.test['x']['ls'] = self.data['x']['ls'][(train_idx + val_idx):, :, :]
-        self.test['y'] = self.data['y'][(train_idx + val_idx):]
+        self.test['x'] = self.data['x'][(train_idx + val_idx):, :, :]
+        self.test['y'] = self.data['y'][(train_idx + val_idx):, :]
 
-        print("    Short Sequence Shapes:")
-        print(f"        X Train: {self.train['x']['ss'].shape}")
-        print(f"        Y Train: {self.train['y'].shape}")
-        print(f"        X Validation: {self.val['x']['ss'].shape}")
-        print(f"        Y Validation: {self.val['y'].shape}")
-        print(f"        X Test: {self.test['x']['ss'].shape}")
-        print(f"        Y Test: {self.test['y'].shape}")
-        print("    Long Sequence Shapes:")
-        print(f"        X Train: {self.train['x']['ls'].shape}")
-        print(f"        Y Train: {self.train['y'].shape}")
-        print(f"        X Validation: {self.val['x']['ls'].shape}")
-        print(f"        Y Validation: {self.val['y'].shape}")
-        print(f"        X Test: {self.test['x']['ls'].shape}")
-        print(f"        Y Test: {self.test['y'].shape}")
-        print("Data splitting complete.")
+        print("        Sequence Shapes:")
+        print(f"            X Train: {self.train['x'].shape}")
+        print(f"            Y Train: {self.train['y'].shape}")
+        print(f"            X Validation: {self.val['x'].shape}")
+        print(f"            Y Validation: {self.val['y'].shape}")
+        print(f"            X Test: {self.test['x'].shape}")
+        print(f"            Y Test: {self.test['y'].shape}")
+        print("    Data splitting complete.")
 
         # DATA SCALING
-        print("Scaling data...")
-        print("    Saving scalers...")
+        print("    Scaling data...")
+        print("        Saving scalers...")
         for i in range(3):
             # numpy forces us to scale each channel individually, thus
-            # needing six total scalers
-            self.sscaler[i].fit_transform(self.train['x']['ss'][:, i, :])
-            self.lscaler[i].fit_transform(self.train['x']['ls'][:, i, :])
-
-            self.sscaler[i].transform(self.val['x']['ss'][:, i, :])
-            self.lscaler[i].transform(self.val['x']['ls'][:, i, :])
-
-            self.sscaler[i].transform(self.test['x']['ss'][:, i, :])
-            self.lscaler[i].transform(self.test['x']['ls'][:, i, :])
-
-            ssfn = f'./scalers/sscaler_{i + 1}.sc'
-            lsfn = f'./scalers/lscaler_{i + 1}.sc'
-
-            # save scalers to disk
-            joblib.dump(self.sscaler[i], ssfn)
-            joblib.dump(self.lscaler[i], lsfn)
-
-            print(f"        Saved sscaler to {ssfn}")
-            print(f"        Saved lscaler to {lsfn}")
-        print("    Scalers saved.")
-        print("Data scaling complete.")
+            # needing three total scalers
+            self.scaler[i].fit_transform(self.train['x'][:, i, :])
+            self.scaler[i].transform(self.val['x'][:, i, :])
+            self.scaler[i].transform(self.test['x'][:, i, :])
+            sfn = f'./files/scalers/scaler_{i + 1}'
+            joblib.dump(self.scaler[i], sfn) # save scalers to disk
+            print(f"            Saved scaler_{i + 1} to {sfn}")
+        print("        Scalers saved.")
+        print("    Data scaling complete.")
+        print("    Saving processed data...")
+        joblib.dump(self.data, './files/data/processed_data')
+        print("    Processed data saved to ./files/data/processed_data")
         print("PREPROCESSING COMPLETE.")
 
     def resample_classes(self):
         pass
     
-    def build_model(self):
-        pass
+    def build_conv1d_model(self):
+        model = models.Sequential([
+            layers.Conv1D(32, 16, activation = 'relu', input_shape = self.data['x'].shape[1:]),
+            layers.Conv1D(32, 16, activation = 'relu'),
+            layers.Conv1D(32, 16, activation = 'relu'),
+            layers.MaxPooling1D(8),
+            layers.Dropout(0.3),
+            layers.Conv1D(64, 8, activation = 'relu'),
+            layers.Conv1D(64, 8, activation = 'relu'),
+            layers.Conv1D(64, 8, activation = 'relu'),
+            layers.MaxPooling1D(4),
+            layers.Dropout(0.3),
+            layers.Conv1D(64, 2, activation = 'relu'),
+            layers.Conv1D(64, 2, activation = 'relu'),
+            layers.Conv1D(64, 2, activation = 'relu'),
+            layers.MaxPooling1D(4),
+            layers.Dropout(0.3),
+            layers.Flatten(),
+            layers.Dense(len(self.labels), activation = 'softmax')
+        ])
+        model.compile(loss = 'categorical_crossentropy', optimizer = optimizers.Adam(), metrics = ['acc'])
+        return model
+    
+    def build_GRU_model(self):
+        model = models.Sequential([
+            layers.GRU(32, activation = 'relu', return_sequences = True, input_shape = (None, 3)),
+            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
+            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
+            layers.Dropout(0.3),
+            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
+            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
+            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
+            layers.Dropout(0.3),
+            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
+            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
+            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
+            layers.Dropout(0.3),
+            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
+            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
+            layers.GRU(32, activation = 'relu', dropout = 0.1, recurrent_dropout = 0.1),
+            layers.Dropout(0.2),
+            #layers.Flatten(),
+            layers.Dense(len(self.labels), activation = 'softmax')
+        ])
+        model.compile(loss = 'categorical_crossentropy', optimizer = optimizers.Adam(), metrics = ['acc'])
+        return model
+    
+    def generate_models(self):
+        print("GENERATING MODELS...")
+        #self.MODELS['GRU'] = self.build_GRU_model()
+        self.MODELS['Conv1D'] = self.build_conv1d_model()
+        print("MODEL GENERATION COMPLETE.")
 
-    def evaluate_model(self):
-        pass
+    def evaluate_models(self):
+        print("EVALUATING MODELS...")
+        EPCHS = 64
+        BATCH = 32
+
+        print("    Training/testing models...")
+        for k in self.MODELS:
+            print(f"        Current Model: {k}")
+            self.HISTS[k] = self.MODELS[k].fit(self.train['x'], self.train['y'], 
+                                               epochs = EPCHS, batch_size = BATCH, 
+                                               validation_data = (self.val['x'], self.val['y']), 
+                                               verbose = 2).history
+            self.TESTS[k] = self.MODELS[k].evaluate(self.test['x'], self.test['y'], verbose = 1)
+            print(f"            Model {k} Test Loss: {self.TESTS[k][0]}")
+            print(f"            Model {k} Test Accuracy: {self.TESTS[k][1]}")
+            print(f"        Model {k} evaluation complete.")
+        print("    Training/testing complete.")
+        
+        print("    Generating and saving plots...")
+        loss_figure = plt.figure(figsize = (20, 15))
+        al = loss_figure.add_subplot(111)
+
+        acc_figure = plt.figure(figsize = (20, 15))
+        aa = acc_figure.add_subplot(111)
+
+        for k in self.HISTS:
+            al.plot(range(EPCHS), self.HISTS[k]['loss'], label = f'{k} Training')
+            al.plot(range(EPCHS), self.HISTS[k]['val_loss'], label = f'{k} Validation')
+            al.plot(self.TESTS[k][0], label = f'{k} Testing')
+
+            aa.plot(range(EPCHS), self.HISTS[k]['acc'], label = f'{k} Training')
+            aa.plot(range(EPCHS), self.HISTS[k]['val_acc'], label = f'{k} Validation')
+            aa.plot(self.TESTS[k][1], label = f'{k} Testing')
+        
+        al.title.set_text("Model Losses")
+        al.set_xlabel("Epoch")
+        al.set_ylabel("Loss")
+        al.legend()
+
+        aa.title.set_text("Model Accuracies")
+        aa.set_xlabel("Epoch")
+        aa.set_ylabel("Accuracy")
+        aa.legend()
+
+        loss_figure.savefig('./files/figures/loss.pdf')
+        acc_figure.savefig('./files/figures/acc.pdf')
+        print("    Plots generated and saved.")
+        
+        print("    Generating and saving metrics...")
+        # TEST METRICS
+        for k in self.HISTS:
+            preds = self.MODELS[k].predict(self.test['x'])
+            predy = np.argmax(preds, axis = 1)
+            truey = np.argmax(self.test['y'], axis = 1)
+            labs = np.arange(len(self.labels))[utils.multiclass.unique_labels(predy)]
+            cm = metrics.confusion_matrix(truey, predy, labels = labs)
+            cr = metrics.classification_report(truey, predy)
+
+            conf_mat_fig = plt.figure(figsize = (20, 15))
+            ac = conf_mat_fig.add_subplot(111)
+            im = ac.matshow(cm)
+            conf_mat_fig.colorbar(im)
+            ac.set_xticklabels(labs)
+            ac.set_yticklabels(labs)
+            ac.set_xlabel('Predicted')
+            ac.set_ylabel('True')
+            conf_mat_fig.savefig(f'./files/figures/{k}-confusion_matrix.pdf')
+
+            joblib.dump(cr, f'./files/metrics/{k}-classification_report')
+            joblib.dump(cm, f'./files/metrics/{k}-confusion_matrix')
+            print(f"\n    {k} Classification Report: ")
+            print(cr)
+            print(f"\n    {k} Confusion Matrix: ")
+            print(cm)
+        print("    Metrics generated and saved.")
+
+        print("MODEL EVALUATION COMPLETE.")
+
+    def create_dirs(self):
+        dirs = ['./files/', './files/figures/', './files/data/', './files/models/', './files/metrics/', './files/models/gru/', './files/models/rnn/', './files/scalers/']
+        self.clean_dirs()
+        for d in dirs:
+            if not os.path.exists(d):
+                os.makedirs(d)
+    
+    def clean_dirs(self):
+        if os.path.exists('./files/'):
+            shutil.rmtree('./files/')
+    
+    def execute(self):
+        self.create_dirs()
+        self.preprocess_data()
+        self.generate_models()
+        self.evaluate_models()
 
 
 
 if __name__ == "__main__":
     rec = HARSystem()
-    rec.preprocess_data()
+    rec.execute()
 
 
 

@@ -22,6 +22,8 @@ Following is the specifications of the device used to record the data:
 
 These data come from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Dataset+for+ADL+Recognition+with+Wrist-worn+Accelerometer).
 
+https://archive.ics.uci.edu/ml/datasets/Dataset+for+ADL+Recognition+with+Wrist-worn+Accelerometer
+
 #### Brief Discussion on Possible Issues and Solutions
 
 Consider the following table containing some statistics on the data.
