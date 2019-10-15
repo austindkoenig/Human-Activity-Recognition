@@ -14,6 +14,7 @@ import keras
 from keras import models
 from keras import layers
 from keras import optimizers
+from keras import regularizers
 from keras.preprocessing import sequence
 
 from sklearn import preprocessing
@@ -43,6 +44,7 @@ class HARSystem(object):
         self.data_fp = './data/' # data filepath
         self.tr_split = 0.6 # train split
         self.val_ts_split = 0.2 # val/test split
+        self.sequence_length = 1024
         self.scaler = [preprocessing.MinMaxScaler(feature_range = (0, 1), copy = False) for _ in range(3)] # scalers for each channel
 
         self.MODELS = {}
@@ -53,22 +55,22 @@ class HARSystem(object):
         self.raw_data = None
 
         self.data = {
-            'x': np.empty((0, 512, 3)),
+            'x': np.empty((0, self.sequence_length, 3)),
             'y': None
         }
 
         self.train = {
-            'x': np.empty((0, 512, 3)),
+            'x': np.empty((0, self.sequence_length, 3)),
             'y': None
         }
 
         self.test = {
-            'x': np.empty((0, 512, 3)),
+            'x': np.empty((0, self.sequence_length, 3)),
             'y': None
         }
 
         self.val = {
-            'x': np.empty((0, 512, 3)),
+            'x': np.empty((0, self.sequence_length, 3)),
             'y': None
         }
 
@@ -97,7 +99,7 @@ class HARSystem(object):
                 rawX.append(x) # raw sample input
                 rawY.append(i) # raw sample output
 
-                xx = sequence.pad_sequences(x.T, maxlen = 512, value = -1) # short-sequence samples                
+                xx = sequence.pad_sequences(x.T, maxlen = self.sequence_length, value = -1) # short-sequence samples                
                 xx = np.reshape(xx, (1, xx.shape[1], xx.shape[0])) # reshape arrays to be stacked
                 self.data['x'] = np.vstack((self.data['x'], xx)) # vertically stack samples
 
@@ -162,25 +164,29 @@ class HARSystem(object):
     
     def build_conv1d_model(self):
         model = models.Sequential([
-            layers.Conv1D(32, 16, activation = 'relu', input_shape = self.data['x'].shape[1:]),
-            layers.Conv1D(32, 16, activation = 'relu'),
-            layers.Conv1D(32, 16, activation = 'relu'),
+            layers.Conv1D(128, 8, activation = 'relu', input_shape = self.data['x'].shape[1:]),
+            layers.Conv1D(128, 8, activation = 'relu'),
+            layers.Conv1D(128, 8, activation = 'relu'),
             layers.MaxPooling1D(8),
-            layers.Dropout(0.3),
-            layers.Conv1D(64, 8, activation = 'relu'),
-            layers.Conv1D(64, 8, activation = 'relu'),
-            layers.Conv1D(64, 8, activation = 'relu'),
+            layers.Dropout(0.5),
+            layers.Conv1D(256, 6, activation = 'relu', kernel_regularizer = regularizers.l2(0.01), bias_regularizer = regularizers.l2(0.01)),
+            layers.Conv1D(256, 6, activation = 'relu', kernel_regularizer = regularizers.l2(0.01), bias_regularizer = regularizers.l2(0.01)),
+            layers.Conv1D(256, 6, activation = 'relu', kernel_regularizer = regularizers.l2(0.01), bias_regularizer = regularizers.l2(0.01)),
+            layers.MaxPooling1D(6),
+            layers.Dropout(0.5),
+            layers.Conv1D(256, 4, activation = 'relu', kernel_regularizer = regularizers.l2(0.01), bias_regularizer = regularizers.l2(0.01)),
+            layers.Conv1D(256, 4, activation = 'relu', kernel_regularizer = regularizers.l2(0.01), bias_regularizer = regularizers.l2(0.01)),
+            layers.Conv1D(256, 4, activation = 'relu', kernel_regularizer = regularizers.l2(0.01), bias_regularizer = regularizers.l2(0.01)),
             layers.MaxPooling1D(4),
-            layers.Dropout(0.3),
-            layers.Conv1D(64, 2, activation = 'relu'),
-            layers.Conv1D(64, 2, activation = 'relu'),
-            layers.Conv1D(64, 2, activation = 'relu'),
-            layers.MaxPooling1D(4),
-            layers.Dropout(0.3),
+            layers.Dropout(0.4),
             layers.Flatten(),
+            layers.Dense(128, activation = 'relu', kernel_regularizer = regularizers.l2(0.01), bias_regularizer = regularizers.l2(0.01)),
+            layers.Dense(128, activation = 'relu', kernel_regularizer = regularizers.l2(0.01), bias_regularizer = regularizers.l2(0.01)),
+            layers.Dropout(0.2),
             layers.Dense(len(self.labels), activation = 'softmax')
         ])
-        model.compile(loss = 'categorical_crossentropy', optimizer = optimizers.Adam(), metrics = ['acc'])
+        model.compile(loss = 'categorical_crossentropy', optimizer = optimizers.RMSprop(), metrics = ['acc'])
+        model.summary()
         return model
     
     def build_GRU_model(self):
@@ -215,8 +221,8 @@ class HARSystem(object):
 
     def evaluate_models(self):
         print("EVALUATING MODELS...")
-        EPCHS = 64
-        BATCH = 32
+        EPCHS = 500
+        BATCH = 16
 
         print("    Training/testing models...")
         for k in self.MODELS:
@@ -241,11 +247,11 @@ class HARSystem(object):
         for k in self.HISTS:
             al.plot(range(EPCHS), self.HISTS[k]['loss'], label = f'{k} Training')
             al.plot(range(EPCHS), self.HISTS[k]['val_loss'], label = f'{k} Validation')
-            al.plot(self.TESTS[k][0], label = f'{k} Testing')
+            al.plot(np.repeat(self.TESTS[k][0], EPCHS), label = f'{k} Testing')
 
             aa.plot(range(EPCHS), self.HISTS[k]['acc'], label = f'{k} Training')
             aa.plot(range(EPCHS), self.HISTS[k]['val_acc'], label = f'{k} Validation')
-            aa.plot(self.TESTS[k][1], label = f'{k} Testing')
+            aa.plot(np.repeat(self.TESTS[k][1], EPCHS), label = f'{k} Testing')
         
         al.title.set_text("Model Losses")
         al.set_xlabel("Epoch")
@@ -275,8 +281,8 @@ class HARSystem(object):
             ac = conf_mat_fig.add_subplot(111)
             im = ac.matshow(cm)
             conf_mat_fig.colorbar(im)
-            ac.set_xticklabels(labs)
-            ac.set_yticklabels(labs)
+            ac.set_xticklabels(self.labels[labs])
+            ac.set_yticklabels(self.labels[labs])
             ac.set_xlabel('Predicted')
             ac.set_ylabel('True')
             conf_mat_fig.savefig(f'./files/figures/{k}-confusion_matrix.pdf')
