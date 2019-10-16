@@ -20,20 +20,22 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+import sys
 import shutil # to delete directories
 import joblib # used to pickle data
 
-import keras
-from keras import models
-from keras import layers
-from keras import optimizers
-from keras import regularizers
+import tensorflow
+from tensorflow.keras import models
+from tensorflow.keras import layers
+from tensorflow.keras import optimizers
+from tensorflow.keras import regularizers
 
 from sklearn import preprocessing
 from sklearn import metrics
 from sklearn import utils
 
 np.random.seed(12)
+sys.stdout = open('output_log.txt', 'w')
 
 
 checkpoints = {
@@ -82,7 +84,7 @@ def extract_data_from_dir(filepath = './data/'):
             data['raw']['x'].append(x) # raw sample input
             data['raw']['y'].append(i) # raw sample output
 
-            xx = keras.preprocessing.sequence.pad_sequences(x.T, maxlen = data['seqlen'], value = -1) # short-sequence samples                
+            xx = tensorflow.keras.preprocessing.sequence.pad_sequences(x.T, maxlen = data['seqlen'], value = -1) # short-sequence samples                
             xx = np.reshape(xx, (1, xx.shape[1], xx.shape[0])) # reshape arrays to be stacked along axis 0
             data['all']['x'] = np.vstack((data['all']['x'], xx)) # vertically stack samples
 
@@ -91,7 +93,7 @@ def extract_data_from_dir(filepath = './data/'):
 
     y = np.array(data['raw']['y'])
     n_cats = np.max(y) + 1
-    y = keras.utils.to_categorical(y, n_cats) # one-hot encode outputs
+    y = tensorflow.keras.utils.to_categorical(y, n_cats) # one-hot encode outputs
     new_indices = np.arange(data['all']['x'].shape[0])
     np.random.shuffle(new_indices) # shuffle data
     data['all']['x'] = data['all']['x'][new_indices, :, :]
@@ -123,9 +125,11 @@ def preprocess_data(train_split = 0.8):
     checkpoints['preprocess'] = True
 
 def generate_models():
+    if not checkpoints['preprocess']:
+        preprocess_data()
     classifiers['cnn'] = cnn()
     for key in classifiers:
-        joblib.dump(classifiers[key], os.path.join(dirs['models'], key))
+        classifiers[key].save(os.path.join(dirs['models'], key + '.h5'))
     checkpoints['model_gen'] = True
 
 def cnn():
@@ -155,19 +159,72 @@ def cnn():
     model.summary()
     return model
 
-def evaluation(EPCHS = 200, BATCH = 16):
+def evaluation(EPCHS = 10, BATCH = 16):
+    if not checkpoints['model_gen']:
+        generate_models()
+
     for k in classifiers:
         print(f"Classifier: {k}")
+        classifiers[k] = models.load_model(os.path.join(dirs['models'], k + '.h5'))
         histories[k] = classifiers[k].fit(data['trn']['x'], data['trn']['y'], 
-                                            epochs = EPCHS, batch_size = BATCH, 
-                                            validation__split = 0.2, 
-                                            verbose = 2).history
-        tests[k] = classifiers[k].evaluate(self.test['x'], self.test['y'], verbose = 1)
-        print(f"    Model {k} Test Loss: {self.TESTS[k][0]}")
-        print(f"    Model {k} Test Accuracy: {self.TESTS[k][1]}")
-        joblib.dump(classifiers[k], os.path.join(dirs['models'], k + '_trained'))
+                                          epochs = EPCHS, batch_size = BATCH, 
+                                          validation_split = 0.2, verbose = 2).history
+        tests[k] = classifiers[k].evaluate(data['tst']['x'], data['tst']['y'], verbose = 1)
 
-# Helper functions
+        print(f"    Model {k} Test Loss: {tests[k][0]}")
+        print(f"    Model {k} Test Accuracy: {tests[k][1]}")
+
+        loss_fig = plt.figure(figsize = (20, 15))
+        al = loss_fig.add_subplot(111)
+        al.plot(range(EPCHS), histories[k]['loss'], label = f'{k} Training')
+        al.plot(range(EPCHS), histories[k]['val_loss'], label = f'{k} Validation')
+        al.plot(np.repeat(tests[k][0], EPCHS), label = f'{k} Testing')
+        al.title.set_text("Model Losses")
+        al.set_xlabel("Epoch")
+        al.set_ylabel("Loss")
+        al.legend()
+
+        acc_fig = plt.figure(figsize = (20, 15))
+        aa = acc_fig.add_subplot(111)
+        aa.plot(range(EPCHS), histories[k]['acc'], label = f'{k} Training')
+        aa.plot(range(EPCHS), histories[k]['val_acc'], label = f'{k} Validation')
+        aa.plot(np.repeat(tests[k][1], EPCHS), label = f'{k} Testing')
+        aa.title.set_text("Model Accuracies")
+        aa.set_xlabel("Epoch")
+        aa.set_ylabel("Accuracy")
+        aa.legend()
+
+        preds = classifiers[k].predict(data['tst']['x'])
+        predy = np.argmax(preds, axis = 1)
+        truey = np.argmax(data['tst']['y'], axis = 1)
+        labs = np.arange(len(data['labs']))[utils.multiclass.unique_labels(predy)]
+
+        cm = metrics.confusion_matrix(truey, predy, labels = data['labs'][labs]) # confusion matrix
+        cr = metrics.classification_report(truey, predy) # classification report
+
+        conf_mat_fig = plt.figure(figsize = (20, 15))
+        ac = conf_mat_fig.add_subplot(111)
+        im = ac.matshow(cm)
+        conf_mat_fig.colorbar(im)
+        ac.set_xticklabels(data['labs'][labs])
+        ac.set_yticklabels(data['labs'][labs])
+        ac.set_xlabel('Predicted')
+        ac.set_ylabel('True')
+
+        # save stuff
+        conf_mat_fig.savefig(os.path.join(dirs['figures'], f'{k}-confusion-matrix.pdf'))
+        joblib.dump(cr, os.path.join(dirs['figures'], f'{k}-classification-report'))
+        joblib.dump(cm, os.path.join(dirs['figures'], f'{k}-confusion-matrix'))
+        classifiers[k].save(os.path.join(dirs['models'], k + '-trained.h5'))
+        joblib.dump(histories[k], os.path.join(dirs['metrics'], f'{k}-history'))
+        joblib.dump(tests[k], os.path.join(dirs['metrics'], f'{k}-test'))
+    checkpoints['model_eval'] = True
+
+def execute():
+    extract_data_from_dir()
+    preprocess_data()
+    generate_models()
+    evaluation()
 
 def _create_dirs():
     _clean_dirs()
