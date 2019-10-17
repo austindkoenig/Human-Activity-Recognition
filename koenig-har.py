@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+import sys
 import shutil
 import joblib
 
@@ -20,6 +21,9 @@ from keras.preprocessing import sequence
 from sklearn import preprocessing
 from sklearn import metrics
 from sklearn import utils
+
+np.random.seed(12)
+sys.stdout = open('output_log.txt', 'w')
 
 class HARSystem(object):
     '''
@@ -158,11 +162,8 @@ class HARSystem(object):
         joblib.dump(self.data, './files/data/processed_data')
         print("    Processed data saved to ./files/data/processed_data")
         print("PREPROCESSING COMPLETE.")
-
-    def resample_classes(self):
-        pass
     
-    def build_conv1d_model(self):
+    def cnn(self):
         model = models.Sequential([
             layers.Conv1D(128, 8, activation = 'relu', input_shape = self.data['x'].shape[1:]),
             layers.Conv1D(128, 8, activation = 'relu'),
@@ -189,39 +190,15 @@ class HARSystem(object):
         model.summary()
         return model
     
-    def build_GRU_model(self):
-        model = models.Sequential([
-            layers.GRU(32, activation = 'relu', return_sequences = True, input_shape = (None, 3)),
-            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
-            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
-            layers.Dropout(0.3),
-            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
-            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
-            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
-            layers.Dropout(0.3),
-            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
-            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
-            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
-            layers.Dropout(0.3),
-            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
-            layers.GRU(32, activation = 'relu', return_sequences = True, dropout = 0.1, recurrent_dropout = 0.1),
-            layers.GRU(32, activation = 'relu', dropout = 0.1, recurrent_dropout = 0.1),
-            layers.Dropout(0.2),
-            #layers.Flatten(),
-            layers.Dense(len(self.labels), activation = 'softmax')
-        ])
-        model.compile(loss = 'categorical_crossentropy', optimizer = optimizers.Adam(), metrics = ['acc'])
-        return model
-    
     def generate_models(self):
         print("GENERATING MODELS...")
         #self.MODELS['GRU'] = self.build_GRU_model()
-        self.MODELS['Conv1D'] = self.build_conv1d_model()
+        self.MODELS['Conv1D'] = self.cnn()
         print("MODEL GENERATION COMPLETE.")
 
     def evaluate_models(self):
         print("EVALUATING MODELS...")
-        EPCHS = 500
+        EPCHS = 300
         BATCH = 16
 
         print("    Training/testing models...")
@@ -236,15 +213,14 @@ class HARSystem(object):
             print(f"            Model {k} Test Accuracy: {self.TESTS[k][1]}")
             print(f"        Model {k} evaluation complete.")
         print("    Training/testing complete.")
+        print("    Generating and saving plots/metrics...")
         
-        print("    Generating and saving plots...")
-        loss_figure = plt.figure(figsize = (20, 15))
-        al = loss_figure.add_subplot(111)
-
-        acc_figure = plt.figure(figsize = (20, 15))
-        aa = acc_figure.add_subplot(111)
-
         for k in self.HISTS:
+            loss_figure = plt.figure(figsize = (20, 15))
+            al = loss_figure.add_subplot(111)
+            acc_figure = plt.figure(figsize = (20, 15))
+            aa = acc_figure.add_subplot(111)
+
             al.plot(range(EPCHS), self.HISTS[k]['loss'], label = f'{k} Training')
             al.plot(range(EPCHS), self.HISTS[k]['val_loss'], label = f'{k} Validation')
             al.plot(np.repeat(self.TESTS[k][0], EPCHS), label = f'{k} Testing')
@@ -253,23 +229,16 @@ class HARSystem(object):
             aa.plot(range(EPCHS), self.HISTS[k]['val_acc'], label = f'{k} Validation')
             aa.plot(np.repeat(self.TESTS[k][1], EPCHS), label = f'{k} Testing')
         
-        al.title.set_text("Model Losses")
-        al.set_xlabel("Epoch")
-        al.set_ylabel("Loss")
-        al.legend()
+            al.title.set_text("Model Losses")
+            al.set_xlabel("Epoch")
+            al.set_ylabel("Loss")
+            al.legend()
 
-        aa.title.set_text("Model Accuracies")
-        aa.set_xlabel("Epoch")
-        aa.set_ylabel("Accuracy")
-        aa.legend()
+            aa.title.set_text("Model Accuracies")
+            aa.set_xlabel("Epoch")
+            aa.set_ylabel("Accuracy")
+            aa.legend()
 
-        loss_figure.savefig('./files/figures/loss.pdf')
-        acc_figure.savefig('./files/figures/acc.pdf')
-        print("    Plots generated and saved.")
-        
-        print("    Generating and saving metrics...")
-        # TEST METRICS
-        for k in self.HISTS:
             preds = self.MODELS[k].predict(self.test['x'])
             predy = np.argmax(preds, axis = 1)
             truey = np.argmax(self.test['y'], axis = 1)
@@ -281,20 +250,23 @@ class HARSystem(object):
             ac = conf_mat_fig.add_subplot(111)
             im = ac.matshow(cm)
             conf_mat_fig.colorbar(im)
-            ac.set_xticklabels(self.labels[labs])
-            ac.set_yticklabels(self.labels[labs])
+            # ac.set_xticklabels(labs)
+            # ac.set_yticklabels(labs)
             ac.set_xlabel('Predicted')
             ac.set_ylabel('True')
-            conf_mat_fig.savefig(f'./files/figures/{k}-confusion_matrix.pdf')
 
+            conf_mat_fig.savefig(f'./files/figures/{k}-confusion_matrix.pdf')
             joblib.dump(cr, f'./files/metrics/{k}-classification_report')
             joblib.dump(cm, f'./files/metrics/{k}-confusion_matrix')
+
             print(f"\n    {k} Classification Report: ")
             print(cr)
             print(f"\n    {k} Confusion Matrix: ")
             print(cm)
-        print("    Metrics generated and saved.")
 
+            loss_figure.savefig('./files/figures/loss.pdf')
+            acc_figure.savefig('./files/figures/acc.pdf')
+            print("    Plots/metrics generated and saved.")
         print("MODEL EVALUATION COMPLETE.")
 
     def create_dirs(self):

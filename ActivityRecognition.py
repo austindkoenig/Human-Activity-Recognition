@@ -24,11 +24,11 @@ import sys
 import shutil # to delete directories
 import joblib # used to pickle data
 
-import tensorflow
-from tensorflow.keras import models
-from tensorflow.keras import layers
-from tensorflow.keras import optimizers
-from tensorflow.keras import regularizers
+import keras
+from keras import models
+from keras import layers
+from keras import optimizers
+from keras import regularizers
 
 from sklearn import preprocessing
 from sklearn import metrics
@@ -84,7 +84,7 @@ def extract_data_from_dir(filepath = './data/'):
             data['raw']['x'].append(x) # raw sample input
             data['raw']['y'].append(i) # raw sample output
 
-            xx = tensorflow.keras.preprocessing.sequence.pad_sequences(x.T, maxlen = data['seqlen'], value = -1) # short-sequence samples                
+            xx = keras.preprocessing.sequence.pad_sequences(x.T, maxlen = data['seqlen'], value = -1)             
             xx = np.reshape(xx, (1, xx.shape[1], xx.shape[0])) # reshape arrays to be stacked along axis 0
             data['all']['x'] = np.vstack((data['all']['x'], xx)) # vertically stack samples
 
@@ -93,7 +93,7 @@ def extract_data_from_dir(filepath = './data/'):
 
     y = np.array(data['raw']['y'])
     n_cats = np.max(y) + 1
-    y = tensorflow.keras.utils.to_categorical(y, n_cats) # one-hot encode outputs
+    y = keras.utils.to_categorical(y, n_cats) # one-hot encode outputs
     new_indices = np.arange(data['all']['x'].shape[0])
     np.random.shuffle(new_indices) # shuffle data
     data['all']['x'] = data['all']['x'][new_indices, :, :]
@@ -101,24 +101,31 @@ def extract_data_from_dir(filepath = './data/'):
     joblib.dump(data, os.path.join(dirs['data'], 'raw_data'))
     checkpoints['extract'] = True
 
-def preprocess_data(train_split = 0.8):
+def preprocess_data(splits = (0.7, 0.15)):
     if not checkpoints['extract']:
         extract_data_from_dir()
 
     data = joblib.load(os.path.join(dirs['data'], 'raw_data'))
 
     # data splitting
-    train_idx = round(train_split * data['all']['x'].shape[0])
+    train_idx = round(splits[0] * data['all']['x'].shape[0])
+    val_idx = round(splits[1] * data['all']['x'].shape[0])
 
     data['trn']['x'] = data['all']['x'][:train_idx, :, :]
     data['trn']['y'] = data['all']['y'][:train_idx, :]
-    data['tst']['x'] = data['all']['x'][train_idx:, :, :]
-    data['tst']['y'] = data['all']['y'][train_idx:, :]
+    data['val']['x'] = data['all']['x'][train_idx:(train_idx + val_idx), :, :]
+    data['val']['y'] = data['all']['y'][train_idx:(train_idx + val_idx), :]
+    data['tvl']['x'] = data['all']['x'][:(train_idx + val_idx), :, :]
+    data['tvl']['y'] = data['all']['y'][:(train_idx + val_idx), :]
+    data['tst']['x'] = data['all']['x'][(train_idx + val_idx):, :, :]
+    data['tst']['y'] = data['all']['y'][(train_idx + val_idx):, :]
 
     # data scaling
     keys = ['x', 'y', 'z']
     for k in range(len(keys)):
         scalers[keys[k]].fit_transform(data['trn']['x'][:, :, k])
+        scalers[keys[k]].transform(data['val']['x'][:, :, k])
+        scalers[keys[k]].transform(data['tvl']['x'][:, :, k])
         scalers[keys[k]].transform(data['tst']['x'][:, :, k])
         joblib.dump(scalers[keys[k]], os.path.join(dirs['scalers'], f'scaler-{keys[k]}'))
     joblib.dump(data, os.path.join(dirs['data'], 'processed_data'))
@@ -168,7 +175,7 @@ def evaluation(EPCHS = 10, BATCH = 16):
         classifiers[k] = models.load_model(os.path.join(dirs['models'], k + '.h5'))
         histories[k] = classifiers[k].fit(data['trn']['x'], data['trn']['y'], 
                                           epochs = EPCHS, batch_size = BATCH, 
-                                          validation_split = 0.2, verbose = 2).history
+                                          validation_data = (data['val']['x'], data['val']['y']), verbose = 2).history
         tests[k] = classifiers[k].evaluate(data['tst']['x'], data['tst']['y'], verbose = 1)
 
         print(f"    Model {k} Test Loss: {tests[k][0]}")

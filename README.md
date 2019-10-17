@@ -93,9 +93,13 @@ Accuracy, $A$, is defined as follows:
 
 $$A = \frac{N_{tp} + N_{tn}}{N}$$
 
+Accuracy is a simple measure of the ratio of test observations for which the model made a correct positive classification to the total number of observations.
+
 Precision, $P$, is defined as follows:
 
 $$P = \frac{N_{tp}}{N_{tp}+N_{fp}}$$
+
+Precision measures the ratio of correct positive classifications to the total number of positive classifications. It is different than accuracy because it can help differentiate between a naively-successful model and a truly-successful model. There's a frequently used example of predicting weather in a city where it is sunny 300 days out of the year. A naively-successful model might predict that everyday will be sunny, resulting in a 82% accuracy rate. While this rate is rather high, it is due to the nature of the data as opposed to the correctness of the model.
 
 Recall, $R$, is defined as follows:
 
