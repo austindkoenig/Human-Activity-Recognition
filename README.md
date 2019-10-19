@@ -10,7 +10,7 @@ The object of this project is to create a classifier which can differentiate bet
 
 Following is the specifications of the device used to record the data:
 
-#### Accelerometer specifications
+#### Accelerometer Specifications
 
 | Property | Description |
 | --- | --- |
@@ -21,8 +21,6 @@ Following is the specifications of the device used to record the data:
 | Location | attached to the right wrist of the user with:<br><ul><li>x axis: pointing toward the hand</li><li>y axis: pointing toward the left</li><li>z axis: perpendicular to the plane of the hand</li></ul> |
 
 These data come from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Dataset+for+ADL+Recognition+with+Wrist-worn+Accelerometer).
-
-https://archive.ics.uci.edu/ml/datasets/Dataset+for+ADL+Recognition+with+Wrist-worn+Accelerometer
 
 #### Brief Discussion on Possible Issues and Solutions
 
@@ -50,11 +48,14 @@ Notice that some of the classes represent fewer than one percent of the entire d
 Furthermore, there are fewer than 1,000 samples in the entire dataset, although the samples are rather large in shape. In cases with so many features and so few samples, our performance is certainly hindered.
 
 Proposed Solutions:
+0. Do nothing
 1. Test a variety of algorithms
 2. Use a resampling technique
 3. Generate synthetic samples
 4. Slices observation sequences to create more samples
 5. Omit underpopulated classes from study
+
+The first option is what we'll call the null solution.
 
 Solution 1 is the most obvious solution, and should be done in many cases to juxtapose model evaluations for the best results possible.
 
@@ -74,7 +75,61 @@ Finally, solution 5 is the easy way out. It is not detrimental to the project si
 
 -----
 
-### Models
+### Model
+
+This project uses a deep neural network with a one-dimensional convolutional base and a fully connected classifier top:
+
+```
+_________________________________________________________________
+Layer (type)                 Output Shape              Param #   
+=================================================================
+conv1d_1 (Conv1D)            (None, 1017, 256)         6400      
+_________________________________________________________________
+conv1d_2 (Conv1D)            (None, 1010, 256)         524544    
+_________________________________________________________________
+conv1d_3 (Conv1D)            (None, 1003, 256)         524544    
+_________________________________________________________________
+max_pooling1d_1 (MaxPooling1 (None, 125, 256)          0         
+_________________________________________________________________
+dropout_1 (Dropout)          (None, 125, 256)          0         
+_________________________________________________________________
+conv1d_4 (Conv1D)            (None, 120, 256)          393472    
+_________________________________________________________________
+conv1d_5 (Conv1D)            (None, 115, 256)          393472    
+_________________________________________________________________
+conv1d_6 (Conv1D)            (None, 110, 256)          393472    
+_________________________________________________________________
+max_pooling1d_2 (MaxPooling1 (None, 18, 256)           0         
+_________________________________________________________________
+dropout_2 (Dropout)          (None, 18, 256)           0         
+_________________________________________________________________
+conv1d_7 (Conv1D)            (None, 15, 256)           262400    
+_________________________________________________________________
+conv1d_8 (Conv1D)            (None, 12, 256)           262400    
+_________________________________________________________________
+conv1d_9 (Conv1D)            (None, 9, 256)            262400    
+_________________________________________________________________
+max_pooling1d_3 (MaxPooling1 (None, 2, 256)            0         
+_________________________________________________________________
+dropout_3 (Dropout)          (None, 2, 256)            0         
+_________________________________________________________________
+flatten_1 (Flatten)          (None, 512)               0         
+_________________________________________________________________
+dense_1 (Dense)              (None, 256)               131328    
+_________________________________________________________________
+dense_2 (Dense)              (None, 256)               65792     
+_________________________________________________________________
+dropout_4 (Dropout)          (None, 256)               0         
+_________________________________________________________________
+dense_3 (Dense)              (None, 14)                3598      
+=================================================================
+Total params: 3,223,822
+Trainable params: 3,223,822
+Non-trainable params: 0
+_________________________________________________________________
+```
+
+As it turns out, while both convolutional neural networks (CNN) and recurrent neural networks (RNN) work well on sequential data, they work well doing different tasks: RNNs are useful for regression whereas CNNs are useful for classification. Thus, this classification project utilized a CNN.
 
 -----
 
@@ -107,13 +162,36 @@ $$R = \frac{N_{tp}}{N_{tp}+N_{fn}}$$
 
 The F1 Score, $F1$, is defined as follows:
 
-$$F1 = 2\frac{PR}{P+R}$$
+$$F1 = 2\frac{PR}{P+R} = \frac{2N_{tp}}{2N_{tp}+N_{fp}+N_{fn}}$$
+
+The F1 score is a sort of conglomerate value based on precision and recall.
 
 A confusion matrix is essentially a table of predictions and actual values. It helps to articulate the different types of misclassifications.
 
 -----
 
 ## Results
+
+
+The usage for the codebase written for this project is as follows:
+  
+```
+from activityrecognition import HARProject
+proj.preprocess_data()
+proj.generate_models()
+proj.evaluate_models()
+```
+
+The model was trained on 256 epochs with a batch size of 16. Following are the training/validation accuracy and loss plots along with a confusion matrix of the test results.
+
+![]('./files/figures/CNN-acc.pdf')
+
+<figure>
+<center>
+<img src='./files/figures/CNN-acc.pdf'/>
+<figcaption>Accuracy of CNN model.</figcaption>
+</center>
+</figure>
 
 -----
 
@@ -124,4 +202,3 @@ A confusion matrix is essentially a table of predictions and actual values. It h
 ## Acknowledgments
 
 These data come from [this repository](https://archive.ics.uci.edu/ml/datasets/Dataset+for+ADL+Recognition+with+Wrist-worn+Accelerometer).
-
