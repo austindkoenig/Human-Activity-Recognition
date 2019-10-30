@@ -287,6 +287,7 @@ class ActivityRecognizer(object):
         print(f"Test Accuracy: {round(results['accuracy'], 4)}")
         print(f"\nConfusion Matrix: \n{results['confusion_matrix']}")
         print(f"\nClassification Report: \n{results['classification_report']}")
+        print(f"\nTraining Time: {metadata['train_time']} s")
         print("```")
 
         print('### Metadata\n')
