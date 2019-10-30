@@ -1,0 +1,72 @@
+{
+    "input_filepath": "./data/",
+    "output_filepath": "./output/",
+    "train_test_split": 0.85,
+    "sequence_length": 1024,
+    "labels": [
+        "Brush_teeth",
+        "Climb_stairs",
+        "Comb_hair",
+        "Descend_stairs",
+        "Drink_glass",
+        "Eat_meat",
+        "Eat_soup",
+        "Getup_bed",
+        "Liedown_bed",
+        "Pour_water",
+        "Sitdown_chair",
+        "Standup_chair",
+        "Use_telephone",
+        "Walk"
+    ],
+    "num_categories": 14,
+    "class_samples": {
+        "Brush_teeth": 12,
+        "Climb_stairs": 102,
+        "Comb_hair": 31,
+        "Descend_stairs": 42,
+        "Drink_glass": 100,
+        "Eat_meat": 5,
+        "Eat_soup": 3,
+        "Getup_bed": 101,
+        "Liedown_bed": 28,
+        "Pour_water": 100,
+        "Sitdown_chair": 100,
+        "Standup_chair": 102,
+        "Use_telephone": 13,
+        "Walk": 100
+    },
+    "total_samples": 839,
+    "class_frequencies": {
+        "Brush_teeth": 0.014303,
+        "Climb_stairs": 0.121573,
+        "Comb_hair": 0.036949,
+        "Descend_stairs": 0.05006,
+        "Drink_glass": 0.11919,
+        "Eat_meat": 0.005959,
+        "Eat_soup": 0.003576,
+        "Getup_bed": 0.120381,
+        "Liedown_bed": 0.033373,
+        "Pour_water": 0.11919,
+        "Sitdown_chair": 0.11919,
+        "Standup_chair": 0.121573,
+        "Use_telephone": 0.015495,
+        "Walk": 0.11919
+    },
+    "shapes": {
+        "x": [
+            839,
+            1024,
+            3
+        ],
+        "y": [
+            839,
+            14
+        ]
+    },
+    "epochs": 256,
+    "batch_size": 4,
+    "train_val_split": 0.2,
+    "train_time": "2875.0744 s",
+    "mean_epoch_train_time": "11.2308 s"
+}
