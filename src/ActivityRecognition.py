@@ -157,14 +157,6 @@ class ActivityRecognizer(object):
         print(json.dumps(shapes, indent = 4))
         print("```")
 
-        # print(f"Train Split: {split}")
-        # print(f"Test Split: {1 - split}")
-        # print(f"Sequence Shapes: ")
-        # print(f"    X Train: {data['train']['x'].shape}")
-        # print(f"    Y Train: {data['train']['y'].shape}")
-        # print(f"    X Test: {data['test']['x'].shape}")
-        # print(f"    Y Test: {data['test']['y'].shape}")
-
         axis_keys = ['x', 'y', 'z']
         for i in range(len(axis_keys)):
             scalers[axis_keys[i]].fit_transform(data['train']['x'][:, :, i])
@@ -265,8 +257,6 @@ class ActivityRecognizer(object):
         evaluation = model.evaluate(test['x'], test['y'], verbose = 2)
 
         print("## Model Evaluation\n")
-        # print(f"| Test Loss | {evaluation[0]} |")
-        # print(f"| Test Accuracy | {evaluation[1]}|\n")
 
         preds = model.predict(test['x'])
         predy = np.argmax(preds, axis = 1)
@@ -298,6 +288,9 @@ class ActivityRecognizer(object):
         print(f"\nConfusion Matrix: \n{results['confusion_matrix']}")
         print(f"\nClassification Report: \n{results['classification_report']}")
         print("```")
+
+        print('### Metadata\n')
+        print(json.dumps(metadata, indent = 4))
 
         loss_figure = plt.figure(figsize = (20, 15))
         loss_axis = loss_figure.add_subplot(111)
