@@ -67,6 +67,6 @@
     "epochs": 256,
     "batch_size": 4,
     "train_val_split": 0.2,
-    "train_time": "2875.0744 s",
-    "mean_epoch_train_time": "11.2308 s"
+    "train_time": "1568.3427 s",
+    "mean_epoch_train_time": "6.1263 s"
 }

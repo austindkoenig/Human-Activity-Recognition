@@ -1,4 +1,4 @@
-from src.HAR import ActivityRecognizer
+from src.ActivityRecognition import ActivityRecognizer
 
 x = ActivityRecognizer()
 x.preprocess_data(sequence_length = 1024)
